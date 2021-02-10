@@ -35,10 +35,8 @@ def readMNIST(fil, typ):
     elif typ == "image":
         return items, siz1, siz2
 
-def show_number(label, image, siz1, siz2):
-    '''Print the label and show the image'''
-
-    print("Label is {}".format(label))
+def show_number(image, siz1, siz2):
+    '''Show the image'''
 
     # Arrange the image
     xx = np.zeros((siz1, siz2))
@@ -50,112 +48,44 @@ def show_number(label, image, siz1, siz2):
     plt.imshow(xx)
     plt.show()
 
-def get_fileName(nn, hidden, outpt, cost):
-    '''Create a consistent filename for the network'''
-
-    fileName = "saved_nn_{}_[".format(nn)
-    for hid in hidden:
-        fileName += "{}_".format(hid)
-    fileName = fileName[:-1] + "]_{}".format(outpt)
-    fileName += "_cost_{:.3f}.npy".format(cost)
-
-    return fileName
-
 def main():
     '''Create and train neural network'''
 
-    # Read the test data
-    print("Loading test data...")
-    file_lab = "ML_numbers/t10k-labels-idx1-ubyte"
-    file_img = "ML_numbers/t10k-images-idx3-ubyte"
-    test_lab = readMNIST(file_lab, typ = "label")
-    test_img, siz1, siz2 = readMNIST(file_img, typ = "image")
+    # Read the data
+    print("Loading training data...")
+    file_lab = "ML_numbers/train-labels-idx1-ubyte"
+    file_img = "ML_numbers/train-images-idx3-ubyte"
+    train_lab = readMNIST(file_lab, typ = "label")
+    train_img, siz1, siz2 = readMNIST(file_img, typ = "image")
     print("Loaded")
 
     # Create the network
     nn = siz1 * siz2
-    hidden = [30]
+    hidden = [300, 100]
     outpt = 10
     numbers_nn = NetworkObject(inpt = nn, hidden = hidden, outpt = outpt,
-                                lbda = 1e-3)
+                                lbda = 1e-4)
 
-    # Get file
-    if len(sys.argv) > 1:
-        fileName = sys.argv[1]
-    else:
-        fileName = None
+    cost = numbers_nn.train(train_img, train_lab, batch_siz = 10,
+                         alpha = 2e-3, verbose = True, tol = 1e-8,
+                         low_cost = 0.05)
 
-    if fileName is not None:
+    # Let user know that the network is trained
+    print("Trained, last cost is {:.2f}".format(cost))
 
-        # If exists, recover thetas
-        print("Loading network found in {}".format(fileName))
-
-        thetas = []
-        nLayers = 2 + len(hidden)
-        with open(fileName, "rb") as fread:
-            for ii in range(nLayers - 1):
-                thetas.append(np.load(fread))
-
-        numbers_nn.set_thetas(thetas)
-
-    else:
-        # Otherwise, train network
-
-        # Read the data
-        print("Loading training data...")
-        file_lab = "ML_numbers/train-labels-idx1-ubyte"
-        file_img = "ML_numbers/train-images-idx3-ubyte"
-        train_lab = readMNIST(file_lab, typ = "label")
-        train_img, siz1, siz2 = readMNIST(file_img, typ = "image")
-        print("Loaded")
-
-        cost = numbers_nn.train(train_img, train_lab, batch_siz = 10,
-                             alpha = 1e-3, verbose = True, tol = 1e-5,
-                             low_cost = 0.2)
-
-        # Let user know that the network is trained
-        print("Trained, last cost is {:.2f}".format(cost))
-
-        fileName = get_fileName(nn, hidden, outpt, cost)
-
-        # Trained, save thetas
-        thetas = numbers_nn.get_thetas()
-        with open(fileName, "wb") as fwrite:
-            for theta in thetas:
-                np.save(fwrite, theta)
+    # Trained, save thetas
+    numbers_nn.save_network(cost)
 
     # Check network in training set:
-    #print("Checking accuracy with training set")
-    #correct_cases = 0
-    #for img, lab in zip(train_img, train_lab):
-        #lab_net = numbers_nn.propagate_indx(img)
-        #if lab_net == lab:
-            #correct_cases += 1
-
-    #acc = correct_cases/len(train_lab) * 100
-    #print("Accuracy = {:.2f}%".format(acc))
-
-    # Now check accuracy with test set:
-
-    # Check network in test set:
-    print("Checking accuracy with test set")
+    print("Checking accuracy with training set")
     correct_cases = 0
-    for img, lab in zip(test_img, test_lab):
-        lab_net = numbers_nn.propagate_indx(img)
+    for img, lab in zip(train_img, train_lab):
+        lab_net, conf = numbers_nn.propagate_indx_conf(img)
         if lab_net == lab:
             correct_cases += 1
 
-    acc = correct_cases/len(test_lab) * 100
+    acc = correct_cases/len(train_lab) * 100
     print("Accuracy = {:.2f}%".format(acc))
-
-    print("Showing random examples")
-    for ii in range(10):
-        jj = np.random.choice(range(len(test_lab)))
-        idxMax = numbers_nn.propagate_indx(test_img[jj])
-
-        # Print network output and plot number
-        print("Network thinks this is a {}".format(idxMax))
-        show_number(test_lab[jj], test_img[jj], siz1, siz2)
 
 if __name__ == "__main__":
     main()

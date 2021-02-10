@@ -7,11 +7,18 @@ class NetworkObject(object):
     -inpt: number of input neurons
     -hidden: list of length equal to hidden layers and each element
              is the number of neurons in each layer
-    -lbda: lambda parameter for regularization
     -output: number of output neurons
+    -lbda: lambda parameter for regularization
+    -fileName: if given, it will load appropriate network from file
     '''
 
-    def __init__(self, inpt = 1, hidden = [], outpt = 1, lbda = 0.1):
+    def __init__(self, inpt = 1, hidden = [], outpt = 1, lbda = 0.1,
+                 fileName = None):
+
+        # Load from filename if present
+        self.fileName = fileName
+        if fileName is not None:
+            inpt, hidden, outpt = self.__parse_fileName(fileName)
 
         # Define sizes of layers
         self.inpt_num = inpt
@@ -54,6 +61,9 @@ class NetworkObject(object):
         sizRand = np.sqrt(6)/np.sqrt(num1 + num2)
         self.theta_arrs.append((np.random.random((num1, num2)) - 0.5) * sizRand)
         self.big_deltas.append(np.zeros((num1, num2)))
+
+        if self.fileName is not None:
+            self.__load_network()
 
     def __sigmoid(self, val):
         '''Calculate sigmoid function of val'''
@@ -172,13 +182,17 @@ class NetworkObject(object):
                 if verbose:
                     print("\n--> Starting again\n")
 
-    def propagate_indx(self, inpt_given):
+    def propagate_indx_conf(self, inpt_given):
         '''Give back the index after propagation'''
 
         output = self.propagate(inpt_given = inpt_given)
         idxMax = np.argmax(output[0])
 
-        return idxMax
+        # Calculate the confidence
+        sum_outputs = sum(output[0])
+        conf = output[0][idxMax]/sum_outputs
+
+        return idxMax, conf
 
     def propagate(self, inpt_given, grad = False):
         '''Propagate network with given input'''
@@ -223,3 +237,49 @@ class NetworkObject(object):
         '''Return the gradient'''
 
         return self.big_deltas
+
+    def __get_fileName(self, cost):
+        '''Create a consistent filename for the network'''
+
+        self.fileName = "saved_nn_{}_".format(self.inpt_num)
+        for hid in self.hidden_num:
+            self.fileName += "{}_".format(hid)
+        self.fileName = self.fileName[:-1] + "_{}".format(self.outpt_num)
+        self.fileName += "_cost_{:.3f}.npy".format(cost)
+
+    def save_network(self, cost):
+        '''Save this network in file'''
+
+        if self.fileName is None:
+            self.__get_fileName(cost)
+
+        # Trained, save thetas
+        thetas = self.get_thetas()
+        with open(self.fileName, "wb") as fwrite:
+            for theta in thetas:
+                np.save(fwrite, theta)
+
+    def __load_network(self):
+        '''Load network from file'''
+
+        thetas = []
+        nLayers = 2 + len(self.hidden_num)
+        with open(self.fileName, "rb") as fread:
+            for ii in range(nLayers - 1):
+                thetas.append(np.load(fread))
+
+        self.set_thetas(thetas)
+
+    def __parse_fileName(self, fileName):
+        '''Parse fileName to get parameters'''
+
+        break_fileName = fileName.split("_")
+
+        # Input and output
+        inpt = int(break_fileName[2])
+        outpt = int(break_fileName[-3])
+
+        # Search for hidden layers
+        hidden = list(map(lambda x: int(x), break_fileName[3:-3]))
+
+        return inpt, hidden, outpt
