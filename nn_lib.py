@@ -183,7 +183,7 @@ class NetworkObject(object):
                     print("\n--> Starting again\n")
 
     def propagate_indx_conf(self, inpt_given):
-        '''Give back the index after propagation'''
+        '''Give back the index and confidence after propagation'''
 
         output = self.propagate(inpt_given = inpt_given)
         idxMax = np.argmax(output[0])
@@ -195,7 +195,7 @@ class NetworkObject(object):
         return idxMax, conf
 
     def propagate(self, inpt_given, grad = False):
-        '''Propagate network with given input'''
+        '''Propagate network with given input and return output'''
 
         # To add the one
         one = np.ones((1, 1))
@@ -247,7 +247,7 @@ class NetworkObject(object):
         self.fileName = self.fileName[:-1] + "_{}".format(self.outpt_num)
         self.fileName += "_cost_{:.3f}.npy".format(cost)
 
-    def save_network(self, cost):
+    def save_network(self, cost = 0):
         '''Save this network in file'''
 
         if self.fileName is None:
