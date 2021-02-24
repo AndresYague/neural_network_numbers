@@ -81,28 +81,26 @@ class NetworkObject(object):
     def get_cost(self, inpts, label_indices):
         '''Calculate cost function'''
 
-        lab_arr = None
-        cost = 0
-        # Add the cost of every example
-        for inpt, label in zip(inpts, label_indices):
-            output = self.propagate(inpt)
-            if lab_arr is None:
-                lab_arr = np.zeros(np.shape(output))
-            else:
-                lab_arr *= 0
+        # Get output
+        outputs = self.propagate(inpts)
 
-            # This is the y-array
-            lab_arr[0][label] = 1
+        # Define label array
+        # and add ones for each index in label_indices
+        lab_arr = np.zeros(np.shape(outputs))
+        for ii in range(len(lab_arr)):
+            lab_arr[ii][label_indices[ii]] = 1
 
-            # Adding the cost
-            cost -= sum(sum(lab_arr * np.log(output) +
-                            (1 - lab_arr) * np.log(1 - output)))
+        # Now add all the costs
+        cost = -sum(sum(lab_arr * np.log(outputs) +
+                        (1 - lab_arr) * np.log(1 - outputs)))
 
         # Regularize
         for theta in self.theta_arrs:
             cost += sum(sum(theta[1:]**2)) * self.lbda * 0.5
 
+        # Finally, divide by m
         cost /= len(inpts)
+
         return cost
 
     def calc_gradient(self, inpts, indices, batch_siz):
@@ -113,52 +111,79 @@ class NetworkObject(object):
         for ii in range(len(self.big_deltas)):
             self.big_deltas[ii] *= 0
 
-        for inpt, label_index in zip(inpts, indices):
-            # Propagate forwards
-            activations, activations_no_bias = self.propagate(inpt, grad = True)
+        # Propagate forwards
+        activations, activations_no_bias = self.propagate(inpts, grad = True)
 
-            # Now backwards
-            jj = -1
-            delt_fin = activations_no_bias[jj]
-            delt_fin[0][label_index] -= 1
+        # Now backwards
+        jj = -1
+        delt_fin = activations_no_bias[jj]
+        for ii in range(mm):
+            delt_fin[ii][indices[ii]] -= 1
 
-            # Save the deltas
-            deltas = [delt_fin]
+        # Save the deltas
+        deltas = [delt_fin]
 
-            ii = len(self.theta_arrs)
-            while ii > 0:
-                jj -= 1; ii -= 1
+        ii = len(self.theta_arrs)
+        while ii > 0:
+            jj -= 1; ii -= 1
 
-                # First add to big_deltas
-                self.big_deltas[ii] += np.matmul(activations[jj].T, deltas[-1])
+            # First add to big_deltas
+            self.big_deltas[ii] += np.matmul(activations[jj].T, deltas[-1])
 
-                # Now calculate new delta and add
-                new_delt = np.matmul(deltas[-1], self.theta_arrs[ii][1:].T)
-                new_delt *= activations_no_bias[jj] * (1 - activations_no_bias[jj])
-                deltas.append(new_delt)
+            # Now calculate new delta and add
+            new_delt = np.matmul(deltas[-1], self.theta_arrs[ii][1:].T)
+            new_delt *= activations_no_bias[jj] * (1 - activations_no_bias[jj])
+            deltas.append(new_delt)
 
         # Add regularization and divide
         for ii in range(len(self.big_deltas)):
             self.big_deltas[ii][1:] += self.lbda * self.theta_arrs[ii][1:]
             self.big_deltas[ii] /= mm
 
-    def train(self, train_inpts, label_indices, batch_siz = 10, alpha = 0.1,
-              verbose = False, tol = 1e-4, low_cost = 0.3):
+    def train(self, train_inpts, label_indices, batch_siz = 10, cv_in = None,
+              cv_lab = None, alpha = 0.1, verbose = False,
+              tol = 1e-4, low_cost = 0.3):
         '''Train network with this example'''
 
         ii = 0
         prevCost = None
+        minCost = None
         while True:
             # Define start and end indices
             init = ii * batch_siz
             end = min(init + batch_siz, len(train_inpts))
 
+            # This specific batch size
+            this_batch = end - init
+
             if ii % 10 == 0:
                 cost = self.get_cost(train_inpts[init:end],
                                      label_indices[init:end])
 
+                # Register minimum cost
+                if minCost is None or cost < minCost:
+                    minCost = cost
+
                 if verbose:
-                    print("The cost is {:.4f}".format(cost))
+                    # Write the current cost
+                    s = "The cost is {:4f}".format(cost)
+
+                    # If use CV set, calculate cost
+                    cost_cv = None
+                    if cv_in is not None and cv_lab is not None:
+                        # Divide in its batch
+                        init_cv = (ii % len(cv_lab)) * batch_siz
+                        end_cv = min(init_cv + batch_siz, len(cv_lab))
+                        init_cv = max(end_cv - batch_siz, 0)
+
+                        cost_cv = self.get_cost(cv_in[init_cv:end_cv],
+                                                cv_lab[init_cv:end_cv])
+
+                        s += " the cv cost is {:.4f}".format(cost_cv)
+
+                    # Print minimum as well
+                    s += " the minimum cost so far is {:.4f}".format(minCost)
+                    print(s)
 
                 if prevCost is not None:
                     diff = abs(prevCost - cost)/cost
@@ -169,8 +194,18 @@ class NetworkObject(object):
                 if cost < low_cost:
                     return cost
 
-            self.calc_gradient(train_inpts[init:end], label_indices[init:end],
-                               batch_siz = batch_siz)
+            # Put the gradient calculation inside of a try
+            # so user can cancel run and have a result
+            try:
+                self.calc_gradient(train_inpts[init:end],
+                                   label_indices[init:end],
+                                   batch_siz = this_batch)
+            except KeyboardInterrupt:
+                cost = self.get_cost(train_inpts[init:end],
+                                     label_indices[init:end])
+                return cost
+            except:
+                raise
 
             # Gradient descent
             for jj in range(len(self.big_deltas)):
@@ -185,23 +220,28 @@ class NetworkObject(object):
     def propagate_indx_conf(self, inpt_given):
         '''Give back the index and confidence after propagation'''
 
-        output = self.propagate(inpt_given = inpt_given)
-        idxMax = np.argmax(output[0])
+        output = self.propagate(inpt_given)
+        idxMax = np.argmax(output, axis = 1)
 
         # Calculate the confidence
-        sum_outputs = sum(output[0])
-        conf = output[0][idxMax]/sum_outputs
+        sum_outputs = np.sum(output, axis = 1)
+        conf = []
+        for ii in range(len(idxMax)):
+            conf.append(output[ii][idxMax[ii]]/sum_outputs)
 
         return idxMax, conf
 
     def propagate(self, inpt_given, grad = False):
         '''Propagate network with given input and return output'''
 
+        if len(np.shape(inpt_given)) == 1:
+            inpt_given = np.reshape(inpt_given, (1, len(inpt_given)))
+
         # To add the one
-        one = np.ones((1, 1))
+        one = np.ones((len(inpt_given), 1))
 
         # Reshape so all are proper vectors
-        no_bias = np.reshape(inpt_given, (1, len(inpt_given)))
+        no_bias = inpt_given
         curr_layer = np.append(one, no_bias, axis = 1)
 
         # If grad, add this one
