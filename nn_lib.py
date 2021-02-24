@@ -227,7 +227,7 @@ class NetworkObject(object):
         sum_outputs = np.sum(output, axis = 1)
         conf = []
         for ii in range(len(idxMax)):
-            conf.append(output[ii][idxMax[ii]]/sum_outputs)
+            conf.append(output[ii][idxMax[ii]]/sum_outputs[ii])
 
         return idxMax, conf
 
