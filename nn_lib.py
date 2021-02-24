@@ -145,6 +145,14 @@ class NetworkObject(object):
               tol = 1e-4, low_cost = 0.3):
         '''Train network with this example'''
 
+        # Transform user input into np arrays if possible
+        train_inpts = np.array(train_inpts)
+        label_indices = np.array(label_indices)
+        if cv_in is not None:
+            cv_in = np.array(cv_in)
+        if cv_lab is not None:
+            cv_lab = np.array(cv_lab)
+
         ii = 0
         prevCost = None
         minCost = None
