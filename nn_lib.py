@@ -156,6 +156,8 @@ class NetworkObject(object):
         ii = 0
         prevCost = None
         minCost = None
+        cost_cv = None
+        minCost_cv = None
         while True:
             # Define start and end indices
             init = ii * batch_siz
@@ -168,29 +170,36 @@ class NetworkObject(object):
                 cost = self.get_cost(train_inpts[init:end],
                                      label_indices[init:end])
 
+                # If use CV set, calculate cost
+                if cv_in is not None and cv_lab is not None:
+                    # Divide in its batch
+                    init_cv = (ii % len(cv_lab)) * batch_siz
+                    end_cv = min(init_cv + batch_siz, len(cv_lab))
+                    init_cv = max(end_cv - batch_siz, 0)
+
+                    cost_cv = self.get_cost(cv_in[init_cv:end_cv],
+                                            cv_lab[init_cv:end_cv])
+
                 # Register minimum cost
                 if minCost is None or cost < minCost:
                     minCost = cost
+                if minCost_cv is None or cost_cv < minCost_cv:
+                    minCost_cv = cost_cv
 
                 if verbose:
                     # Write the current cost
                     s = "The cost is {:4f}".format(cost)
 
                     # If use CV set, calculate cost
-                    cost_cv = None
-                    if cv_in is not None and cv_lab is not None:
-                        # Divide in its batch
-                        init_cv = (ii % len(cv_lab)) * batch_siz
-                        end_cv = min(init_cv + batch_siz, len(cv_lab))
-                        init_cv = max(end_cv - batch_siz, 0)
-
-                        cost_cv = self.get_cost(cv_in[init_cv:end_cv],
-                                                cv_lab[init_cv:end_cv])
+                    if cost_cv is not None:
 
                         s += " the cv cost is {:.4f}".format(cost_cv)
 
                     # Print minimum as well
                     s += " the minimum cost so far is {:.4f}".format(minCost)
+                    if minCost_cv is not None:
+                        s += " the minimum cv cost so far is {:.4f}".format(minCost_cv)
+
                     print(s)
 
                 if prevCost is not None:
@@ -200,7 +209,11 @@ class NetworkObject(object):
 
                 prevCost = cost
                 if cost < low_cost:
-                    return cost
+                    if cost_cv is not None:
+                        if cost_cv < low_cost:
+                            return cost
+                    else:
+                        return cost
 
             # Put the gradient calculation inside of a try
             # so user can cancel run and have a result
