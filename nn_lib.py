@@ -220,8 +220,7 @@ class NetworkObject(object):
                                    label_indices[init:end],
                                    batch_siz = this_batch)
             except KeyboardInterrupt:
-                cost = self.get_cost(train_inpts[init:end],
-                                     label_indices[init:end])
+                cost = self.get_cost(train_inpts, label_indices)
                 return cost
             except:
                 raise

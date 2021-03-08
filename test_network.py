@@ -74,8 +74,11 @@ def main():
     correct_cases = 0; conf_incorrect = 0
     conf_cases = 0
     conf_level = 0.7
-    for img, lab in zip(test_img, test_lab):
-        lab_net, conf = numbers_nn.propagate_indx_conf(img)
+    labels, confidence = numbers_nn.propagate_indx_conf(test_img)
+    for ii in range(len(test_lab)):
+        lab_net = labels[ii]
+        conf = confidence[ii]
+        lab = test_lab[ii]
 
         # Check correct rate
         if lab_net == lab:
@@ -103,9 +106,9 @@ def main():
 
         # Print network output and plot number
         print()
-        print("Network thinks this is a {}".format(idxMax), end = "")
-        print(" with a confidence of {:.2f}%".format(conf * 100))
-        print("The label is {}".format(test_lab[jj]))
+        print(f"Network thinks this is a {idxMax[0]}", end = "")
+        print(" with a confidence of {:.2f}%".format(conf[0] * 100))
+        print(f"The label is {test_lab[jj]}")
         show_number(test_img[jj], siz1, siz2)
 
 if __name__ == "__main__":

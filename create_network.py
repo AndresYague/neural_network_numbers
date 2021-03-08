@@ -61,14 +61,17 @@ def main():
 
     # Create the network
     nn = siz1 * siz2
-    hidden = [300, 100]
+    hidden = [100, 100]
     outpt = 10
     numbers_nn = NetworkObject(inpt = nn, hidden = hidden, outpt = outpt,
                                 lbda = 1e-4)
 
     cost = numbers_nn.train(train_img, train_lab, batch_siz = 10,
-                         alpha = 2e-3, verbose = True, tol = 1e-8,
-                         low_cost = 0.05)
+                         alpha = 1e-2, verbose = True, tol = 1e-8,
+                         low_cost = 1.00, cycle_cost = 2000)
+    cost = numbers_nn.train(train_img, train_lab, batch_siz = 10,
+                         alpha = 1e-3, verbose = True, tol = 1e-8,
+                         low_cost = 0.05, cycle_cost = 2000)
 
     # Let user know that the network is trained
     print("Trained, last cost is {:.2f}".format(cost))
@@ -79,9 +82,9 @@ def main():
     # Check network in training set:
     print("Checking accuracy with training set")
     correct_cases = 0
-    for img, lab in zip(train_img, train_lab):
-        lab_net, conf = numbers_nn.propagate_indx_conf(img)
-        if lab_net == lab:
+    labels, confidence = numbers_nn.propagate_indx_conf(train_img)
+    for ii in range(len(train_lab)):
+        if train_lab[ii] == labels[ii]:
             correct_cases += 1
 
     acc = correct_cases/len(train_lab) * 100
