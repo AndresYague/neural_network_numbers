@@ -142,7 +142,7 @@ class NetworkObject(object):
 
     def train(self, train_inpts, label_indices, batch_siz = 10, cv_in = None,
               cv_lab = None, alpha = 0.1, verbose = False,
-              tol = 1e-4, low_cost = 0.3):
+              tol = 1e-4, low_cost = 0.3, cycle_cost = 200):
         '''Train network with this example'''
 
         # Transform user input into np arrays if possible
@@ -166,9 +166,8 @@ class NetworkObject(object):
             # This specific batch size
             this_batch = end - init
 
-            if ii % 10 == 0:
-                cost = self.get_cost(train_inpts[init:end],
-                                     label_indices[init:end])
+            if ii % cycle_cost == 0:
+                cost = self.get_cost(train_inpts, label_indices)
 
                 # If use CV set, calculate cost
                 if cv_in is not None and cv_lab is not None:
@@ -177,8 +176,7 @@ class NetworkObject(object):
                     end_cv = min(init_cv + batch_siz, len(cv_lab))
                     init_cv = max(end_cv - batch_siz, 0)
 
-                    cost_cv = self.get_cost(cv_in[init_cv:end_cv],
-                                            cv_lab[init_cv:end_cv])
+                    cost_cv = self.get_cost(cv_in, cv_lab)
 
                 # Register minimum cost
                 if minCost is None or cost < minCost:
